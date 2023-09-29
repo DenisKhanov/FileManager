@@ -1,0 +1,2 @@
+rsrc -manifest main.exe.manifest -ico 06magnify.ico -o icon.syso   //Создание конфигурационного файла .syso
+go build -o File_manager_v0.3.exe  //Билд проекта
