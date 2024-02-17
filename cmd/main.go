@@ -1,12 +1,12 @@
 package main
 
 import (
-	"GoProgects/FileMan/cmd/fileSorter/interfaces"
+	"GoProgects/FileMan/internal"
 	"fmt"
 )
 
 func main() {
-	fileHandler := interfaces.HandlerFile{}
+	fileHandler := internal.HandlerFile{}
 	var choice int
 	// Выбор метода
 	for {
@@ -26,15 +26,16 @@ func main() {
 
 		switch choice {
 		case 1:
-			interfaces.CreateDirectoryTree(fileHandler)
+			internal.CreateDirectoryTree(fileHandler)
 		case 2:
-			interfaces.FindFileInDirectory(fileHandler)
+			internal.FindFileInDirectory(fileHandler)
 		case 3:
-			interfaces.OpenFindedFile(fileHandler)
+			internal.OpenFindedFile(fileHandler)
 		case 4:
-			interfaces.FilesInfoInDir(fileHandler)
+			internal.FilesInfoInDir(fileHandler)
 		case 5:
-			interfaces.CreateNewFile(fileHandler)
+			internal.CreateNewFile(fileHandler)
+
 		default:
 			fmt.Println("Неверный выбор")
 		}

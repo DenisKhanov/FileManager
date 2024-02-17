@@ -1,19 +1,21 @@
-package interfaces
+package internal
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type FileManager interface {
 	CreateDirectoryTree(string, int) (string, error)
 	FindFileInDirectory(string, string) (string, error)
-	OpenFoundFile(string, string) string
+	OpenFoundFile(string, string) ([]byte, error)
 	FilesInfoInDir(string) (string, error)
 	CreateNewFile(string) (string, error)
 }
@@ -42,8 +44,10 @@ func (h HandlerFile) CreateDirectoryTree(rootDirectory string, countPath int) (s
 // FindFileInDirectory finds a file in a directory and returns its absolute path or an error.
 func (h HandlerFile) FindFileInDirectory(rootDirectory, targetFile string) (string, error) {
 	fmt.Println("Идет поиск файла в директории...")
-	var foundPath string
-	err := filepath.Walk(rootDirectory, func(path string, info os.FileInfo, err error) error {
+	var (
+		foundPath string // Путь к найденному файлу файлу
+	)
+	err := filepath.WalkDir(rootDirectory, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			switch {
 			case errors.Is(err, os.ErrPermission):
@@ -73,16 +77,18 @@ func (h HandlerFile) FindFileInDirectory(rootDirectory, targetFile string) (stri
 }
 
 // OpenFoundFile Starts the function FindFileInDirectory and reads the file according to the path found by it.
-func (h HandlerFile) OpenFoundFile(rootDirectory string, nameFile string) string {
-	fmt.Println("Идет поиск файла в директории...")
+func (h HandlerFile) OpenFoundFile(rootDirectory string, nameFile string) ([]byte, error) {
 	foundPath, err := h.FindFileInDirectory(rootDirectory, nameFile)
 	if err != nil {
-		return err.Error()
+		err.Error()
+		return nil, err
+
 	}
 
-	file, err := os.Open(foundPath)
+	file, err := os.OpenFile(foundPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0600)
 	if err != nil {
-		return fmt.Errorf("проблемы с чтением файла: %s", err).Error()
+		fmt.Errorf("проблемы с чтением файла: %s", err).Error()
+		return nil, fmt.Errorf("проблемы с чтением файла: %s", err)
 	}
 	defer file.Close()
 
@@ -95,13 +101,45 @@ func (h HandlerFile) OpenFoundFile(rootDirectory string, nameFile string) string
 			break
 		}
 		if err != nil {
-			return fmt.Sprintf("Ошибка чтения файла: %s\n", err)
+			fmt.Errorf("Ошибка чтения файла: %s\n", err).Error()
+			return nil, err
 		}
 		fileData = append(fileData, buffer[:bytesRead]...)
 	}
 
 	fmt.Println("Файл который вы ищете был найден по данному пути ->->-> ", foundPath)
-	return fmt.Sprintf("Содержимое файла ---> %+v", string(fileData))
+	fmt.Printf("Содержимое файла:\n\n%+v\n", string(fileData))
+	fmt.Println("Вы хотите дописать текст в файл? (y/n): ")
+	var input string
+	fmt.Scanln(&input)
+	fmt.Scanln()
+	if input == "y" {
+		fmt.Println("Введите ниже текст, который вы хотите добавить в файл:")
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			_, err = file.WriteString(scanner.Text())
+			if err != nil {
+				fmt.Errorf("Ошибка записи в файл: %s\n", err).Error()
+				return nil, err
+			} else {
+				fmt.Printf("Текст успешно добавлен в файл: %s\n", foundPath)
+			}
+		}
+	}
+
+	for {
+		bytesRead, err := file.Read(buffer)
+		if err == io.EOF {
+			// Достигнут конец файла, выходим из цикла
+			break
+		}
+		if err != nil {
+			fmt.Errorf("Ошибка чтения файла: %s\n", err).Error()
+			return nil, err
+		}
+		fileData = append(fileData, buffer[:bytesRead]...)
+	}
+	return fileData, err
 }
 
 // FilesInfoInDir Provides information about the number of files of types (Audio,Video, Image, Documents, Other) in the directory.
@@ -128,7 +166,7 @@ func (h HandlerFile) FilesInfoInDir(rootDirectory string) (string, error) {
 	for key, _ := range FileTypes {
 		CountTypes[key] = make(map[string]int64)
 	}
-	err := filepath.Walk(rootDirectory, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(rootDirectory, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("Что-то не так с родительской директорией %s", err)
 		} else if info.IsDir() { //проверяем является ли путь директорией
@@ -137,7 +175,8 @@ func (h HandlerFile) FilesInfoInDir(rootDirectory string) (string, error) {
 		for k, v := range FileTypes {
 			if strings.Contains(v, filepath.Ext(info.Name())) {
 				CountTypes[k]["Количество"]++
-				CountTypes[k]["Размер"] += info.Size()
+				fileInfo, _ := info.Info()
+				CountTypes[k]["Размер"] += fileInfo.Size()
 			}
 		}
 		return err
@@ -236,11 +275,16 @@ func FindFileInDirectory(hf FileManager) {
 		fmt.Println(err)
 	}
 
+	timeStart := time.Now()
 	result, err := hf.FindFileInDirectory(rootDirectory, targetFile)
 	if err != nil {
 		fmt.Println(err)
+		timeEnd := time.Now()
+		fmt.Printf("Поиск выполнен за: %s\n", timeEnd.Sub(timeStart))
 	} else {
-		fmt.Printf("Файл который вы искали находится в этой директории: %s", result)
+		timeEnd := time.Now()
+		fmt.Printf("Поиск выполнен за: %s\n", timeEnd.Sub(timeStart))
+		fmt.Printf("Файл который вы искали находится в этой директории: %s\n", result)
 	}
 }
 
@@ -259,7 +303,7 @@ func OpenFindedFile(hf FileManager) {
 		fmt.Println(err)
 	}
 
-	fmt.Println(hf.OpenFoundFile(rootDirectory, nameFile))
+	hf.OpenFoundFile(rootDirectory, nameFile)
 }
 
 // FilesInfoInDir Provides information about the number of files of types (Audio,Video, Image, Documents, Other) in the directory.
