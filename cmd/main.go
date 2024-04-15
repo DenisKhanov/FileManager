@@ -1,12 +1,12 @@
 package main
 
 import (
-	"GoProgects/FileMan/internal"
+	"GoProgects/FileMan/internal/service"
 	"fmt"
 )
 
 func main() {
-	fileHandler := internal.HandlerFile{}
+	fileHandler := service.HandlerFile{}
 	var choice int
 	// Выбор метода
 	for {
@@ -26,15 +26,15 @@ func main() {
 
 		switch choice {
 		case 1:
-			internal.CreateDirectoryTree(fileHandler)
+			service.CreateDirectoryTree(fileHandler)
 		case 2:
-			internal.FindFileInDirectory(fileHandler)
+			service.FindFileInDirectory(fileHandler)
 		case 3:
-			internal.OpenFindedFile(fileHandler)
+			service.OpenFindedFile(fileHandler)
 		case 4:
-			internal.FilesInfoInDir(fileHandler)
+			service.FilesInfoInDir(fileHandler)
 		case 5:
-			internal.CreateNewFile(fileHandler)
+			service.CreateNewFile(fileHandler)
 
 		default:
 			fmt.Println("Неверный выбор")
